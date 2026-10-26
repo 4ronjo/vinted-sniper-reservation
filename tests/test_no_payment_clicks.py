@@ -13,6 +13,7 @@ browser = import_module('browser')
 class FakeButton:
     def __init__(self, label, driver):
         self.text = label
+        self.tag_name = 'button'
         self.driver = driver
         self.clicks = 0
 
@@ -23,6 +24,8 @@ class FakeButton:
         return True
 
     def get_attribute(self, name):
+        if name == 'type':
+            return 'button'
         return None
 
     def click(self):
@@ -96,3 +99,23 @@ def test_only_exact_listing_buy_button_clicks_once():
     assert browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', False)
     assert pay.clicks == 0
     assert buy.clicks == 1
+
+
+def test_submit_button_never_clicked():
+    driver = FakeDriver()
+    dangerous = FakeButton('Kaufen', driver)
+    original = dangerous.get_attribute
+    dangerous.get_attribute = lambda name: 'submit' if name == 'type' else original(name)
+    driver.controls = [dangerous]
+    with pytest.raises(RuntimeError, match='Kein eindeutiger Kaufen-Button'):
+        browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', False)
+    assert dangerous.clicks == 0
+
+
+def test_two_ambiguous_buy_buttons_cannot_click():
+    driver = FakeDriver()
+    buy1, buy2 = FakeButton('Kaufen', driver), FakeButton('Kaufen', driver)
+    driver.controls = [buy1, buy2]
+    with pytest.raises(RuntimeError, match='Mehrere Kaufen-Buttons'):
+        browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', False)
+    assert buy1.clicks == buy2.clicks == 0
