@@ -29,6 +29,8 @@ services:
       - browser
     env_file:
       - .checkout.env
+    ports:
+      - "127.0.0.1:8765:8765"
     security_opt:
       - no-new-privileges:true
 
