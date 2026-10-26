@@ -28,6 +28,7 @@ DRY_RUN = os.getenv('SNIPER_CHECKOUT_DRY_RUN', 'true').lower() == 'true'
 GRID_URL = os.getenv('SNIPER_SELENIUM_URL', 'http://browser:4444/wd/hub')
 HOME_URL = os.getenv('SNIPER_VINTED_HOME', 'https://www.vinted.de')
 seen: set[str] = set()
+paused = Event()
 lock = Lock()
 stop = Event()
 state = {'stage': 'starting', 'item': None, 'message': ''}
@@ -52,11 +53,20 @@ def do_work():
                 change_state('browser-not-ready')
                 stop.wait(5)
                 continue
+        if paused.is_set():
+            change_state('paused', message='Manual browser control – no automatic navigation')
+            stop.wait(0.5)
+            continue
         try:
             listing = QUEUE.get(timeout=1)
         except Empty:
             continue
         try:
+            # A pause may have arrived while fetching the next item.
+            while paused.is_set() and not stop.is_set():
+                stop.wait(0.5)
+            if stop.is_set():
+                return
             change_state('opening', listing.item_key)
             opened = open_listing_and_click_buy(driver, listing.url, DRY_RUN)
             if not opened:
@@ -116,7 +126,7 @@ app = FastAPI(title='Vinted Shared Browser', lifespan=lifespan)
 def health():
     with lock:
         current = state.copy()
-    return {'status': current, 'queued': QUEUE.qsize(), 'dry_run': DRY_RUN}
+    return {'status': current, 'queued': QUEUE.qsize(), 'dry_run': DRY_RUN, 'paused': paused.is_set()}
 
 
 @app.post('/hook/{secret}')
@@ -151,3 +161,19 @@ async def webhook(secret: str, request: Request):
             seen.add(listing.item_key)
         count += 1
     return {'queued': count, 'pending': QUEUE.qsize()}
+
+
+@app.post('/control/pause/{secret}')
+def pause_browser(secret: str):
+    if not SECRET or not hmac.compare_digest(secret, SECRET):
+        raise HTTPException(status_code=403, detail='Invalid token')
+    paused.set()
+    return {'paused': True, 'note': 'In-progress navigation cannot be interrupted mid-click'}
+
+
+@app.post('/control/resume/{secret}')
+def resume_browser(secret: str):
+    if not SECRET or not hmac.compare_digest(secret, SECRET):
+        raise HTTPException(status_code=403, detail='Invalid token')
+    paused.clear()
+    return {'paused': False}
