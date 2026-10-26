@@ -1,4 +1,4 @@
-# Overlay: docker compose -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
+# Overlay: docker compose --env-file .checkout.env -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
 services:
   vinted-sniper:
     image: vinted-sniper-reservation:local
