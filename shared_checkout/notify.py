@@ -19,7 +19,9 @@ def email_status(item: Listing, status: str, details: str) -> None:
     msg['From'] = user
     msg['To'] = destination
     msg['Subject'] = f'Vinted: {status} – {item.title}'
+    viewer_url = os.getenv('SNIPER_CHECKOUT_VIEW_URL', 'http://localhost:7900/vnc.html?autoconnect=1&resize=scale')
     msg.set_content(
+        f'Browseransicht (derselbe Checkout, kein neues Vinted-Fenster): {viewer_url}\\n\\n'
         f'Status: {status}\nArtikel: {item.title}\nSuche: {item.search}\n'
         f'Preis inkl. Käuferschutz: {item.total} {item.currency}\n'
         f'Artikel: {item.url}\n\n{details}\n\n'
