@@ -1,0 +1,36 @@
+# Overlay: docker compose -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
+services:
+  vinted-sniper:
+    image: vinted-sniper-reservation:local
+    build: .
+    environment:
+      VINTED_SNIPER_POLL_DEFAULT_INTERVAL_S: "10"
+  browser:
+    build:
+      context: .
+      dockerfile: shared_checkout/Dockerfile.browser
+    shm_size: "2gb"
+    environment:
+      SE_NODE_MAX_SESSIONS: "1"
+      SE_NODE_SESSION_TIMEOUT: "86400"
+      SE_VNC_NO_PASSWORD: "false"
+      SE_VNC_PASSWORD: "${SNIPER_VNC_PASSWORD:?Set SNIPER_VNC_PASSWORD in .env}"
+    ports:
+      - "127.0.0.1:7900:7900"
+    volumes:
+      - shared-browser-profile:/home/seluser/snipe-profile
+    restart: unless-stopped
+  checkout-worker:
+    build:
+      context: .
+      dockerfile: shared_checkout/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - browser
+    env_file:
+      - .checkout.env
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  shared-browser-profile:
