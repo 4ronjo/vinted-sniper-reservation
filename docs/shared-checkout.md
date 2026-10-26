@@ -11,7 +11,7 @@ the checkout using the **same visible Chromium browser**.
 
 ## 1. Configure
 
-Use the `feature/checkout-snipe-email` branch.
+Use the `feature/checkout-snipe-email` branch. The same live browser can be viewed through noVNC; it is NOT the Vinted tab in another browser or app.
 
 Copy `checkout.env.example` to `.checkout.env`, then set:
 - `SNIPER_CHECKOUT_WEBHOOK_TOKEN`: random secret of >=24 characters. Generate
@@ -22,11 +22,7 @@ Copy `checkout.env.example` to `.checkout.env`, then set:
   your ordinary Gmail password.
 - Keep `SNIPER_CHECKOUT_DRY_RUN=true` initially (opens listing but NOT checkout).
 
-In the root `.env` file, set a strong password for the shared browser:
-
-```
-SNIPER_VNC_PASSWORD=YOUR_OWN_LONG_PRIVATE_PASSWORD
-```
+Set `SNIPER_VNC_PASSWORD` in **.checkout.env** alongside your other checkout settings. Do not add it to the original sniper's `.env` file (which is parsed with strict settings).
 
 Never commit `.env` or `.checkout.env`. Vinted login happens interactively
 inside the browser; no Vinted password belongs in either environment file.
@@ -34,7 +30,7 @@ inside the browser; no Vinted password belongs in either environment file.
 ## 2. Start Docker
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
+docker compose --env-file .checkout.env -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
 ```
 
 Keep the shared browser open in a browser tab on your computer:
@@ -66,7 +62,7 @@ When the dry run, account login and alert work, change
 `SNIPER_CHECKOUT_DRY_RUN=false` in `.checkout.env` and restart only the worker:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.checkout.yml up -d --force-recreate checkout-worker
+docker compose --env-file .checkout.env -f docker-compose.yml -f docker-compose.checkout.yml up -d --force-recreate checkout-worker
 ```
 
 ## 4. Same checkout screen, no automatic payments
@@ -78,12 +74,7 @@ opens checkout, the worker **stops all browser interactions**, emails
 remains on checkout. You can interact with this same screen. Once you navigate
 away, the worker can handle the next queued item.
 
-If you want full manual control for longer, stop the worker while leaving the
-browser running:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.checkout.yml stop checkout-worker
-```
+For manual control, use the **pause endpoint** (see below) while leaving the worker running. Stopping the worker normally closes its managed browser session and should not be used to hold a checkout.
 
 The bot cannot cause a paid order: there is no automated checkout confirmation
 or payment click anywhere in the source.
@@ -109,5 +100,23 @@ or payment click anywhere in the source.
 Diagnostics:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.checkout.yml logs -f checkout-worker
+docker compose --env-file .checkout.env -f docker-compose.yml -f docker-compose.checkout.yml logs -f checkout-worker
 ```
+
+## Manual pause/resume
+
+You can pause automatic navigation without closing the shared browser:
+
+```bash
+TOKEN=$(sed -n 's/^SNIPER_CHECKOUT_WEBHOOK_TOKEN=//p' .checkout.env)
+curl -X POST "http://127.0.0.1:8765/control/pause/$TOKEN"
+# Later, after leaving the checkout:
+curl -X POST "http://127.0.0.1:8765/control/resume/$TOKEN"
+```
+
+The worker's control API is bound to the host loopback address only. Never expose
+it directly on the public internet. In noVNC, leave the tab open to see the
+checkout immediately; clicking the view link in an email also opens the **same
+remote browser instance**, not a new checkout session. For access from your phone,
+set up private authenticated VPN access (e.g., Tailscale); localhost URLs work
+only on the computer running Docker.
