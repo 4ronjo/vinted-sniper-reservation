@@ -35,13 +35,16 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
 
     candidate = None
     # Listings are hydrated by JavaScript; wait briefly for a safely identifiable control.
-    WebDriverWait(driver, 8, poll_frequency=0.25).until(
-        lambda d: any(
-            el.is_displayed() and el.is_enabled()
-            and re.sub(r'\s+', ' ', (el.text or el.get_attribute('aria-label') or '').strip()).casefold() in BUY_TEXTS
-            for el in d.find_elements(By.CSS_SELECTOR, 'button, a')
+    try:
+        WebDriverWait(driver, 8, poll_frequency=0.25).until(
+            lambda d: any(
+                el.is_displayed() and el.is_enabled()
+                and re.sub(r'\s+', ' ', (el.text or el.get_attribute('aria-label') or '').strip()).casefold() in BUY_TEXTS
+                for el in d.find_elements(By.CSS_SELECTOR, 'button, a')
+            )
         )
-    )
+    except Exception as exc:
+        raise RuntimeError('Kein eindeutiger Kaufen-Button gefunden; kein Klick') from exc
     for el in driver.find_elements(By.CSS_SELECTOR, 'button, a'):
         try:
             if not (el.is_displayed() and el.is_enabled()):
