@@ -1,0 +1,4 @@
+FROM selenium/standalone-chromium:latest
+USER root
+RUN mkdir -p /home/seluser/snipe-profile && chown -R 1200:1201 /home/seluser/snipe-profile
+USER 1200
