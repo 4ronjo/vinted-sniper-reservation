@@ -45,7 +45,7 @@ def is_checkout_url(value: str) -> bool:
     try:
         parsed = urlsplit(value)
         host = (parsed.hostname or '').lower().removeprefix('www.')
-        return parsed.scheme == 'https' and host.startswith('vinted.') and host[7:] in ALLOWED_TLDS and bool(CHECKOUT_PATH.match(parsed.path))
+        return parsed.scheme == 'https' and host.startswith('vinted.') and host[7:] in ALLOWED_TLDS and parsed.username is None and parsed.password is None and parsed.port in (None, 443) and bool(CHECKOUT_PATH.match(parsed.path))
     except ValueError:
         return False
 
@@ -62,6 +62,8 @@ def parse_listing(item: object, search: str, max_total: Decimal | None) -> Listi
     try:
         total = Decimal(str(amount)) if amount is not None else None
     except (InvalidOperation, ValueError):
+        return None
+    if total is not None and (not total.is_finite() or total < 0):
         return None
     if max_total is not None and (total is None or total > max_total):
         return None
