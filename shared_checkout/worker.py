@@ -58,6 +58,14 @@ def do_work():
             stop.wait(0.5)
             continue
         try:
+            if is_checkout_url(driver.current_url):
+                change_state('manual-checkout-protected', message='Existing checkout is not overwritten')
+                stop.wait(1)
+                continue
+        except Exception:
+            driver = None
+            continue
+        try:
             listing = QUEUE.get(timeout=1)
         except Empty:
             continue
@@ -65,6 +73,12 @@ def do_work():
             # A pause may have arrived while fetching the next item.
             while paused.is_set() and not stop.is_set():
                 stop.wait(0.5)
+            if stop.is_set():
+                break
+            # The user may have opened checkout between queue polling and navigation.
+            while not stop.is_set() and is_checkout_url(driver.current_url):
+                change_state('manual-checkout-protected', listing.item_key)
+                stop.wait(1)
             if stop.is_set():
                 break
             change_state('opening', listing.item_key)
