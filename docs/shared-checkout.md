@@ -92,7 +92,8 @@ or payment click anywhere in the source.
 
 - Original app maximum speed: **minimum 10-second polling**. New searches
   default to 10s on this branch. Existing saved searches have their own stored
-  intervals and must be changed manually in the dashboard.
+  intervals. To use 10 seconds, delete and re-create those searches with the
+  10-second interval in the dashboard (the upstream UI has no interval edit).
 - Real elapsed detection latency depends on Vinted's indexing, network delay,
   rate limiting and queue length; microsecond API polling is not practical.
 - If Vinted's button label or checkout URL changes, the automation fails
