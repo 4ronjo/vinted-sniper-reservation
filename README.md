@@ -80,3 +80,13 @@ lists; Vinted's terms prohibit automated access, so running it is your own call.
 [docs/legal.md](docs/legal.md).
 
 MIT licensed. Contributions welcome — especially bug reports with logs attached.
+
+
+## Experimental shared checkout (fork-specific)
+
+This fork also contains an optional Docker Selenium/noVNC checkout worker. It can
+open the listing-page **Kaufen** flow in a single browser shared with the user,
+but **never submits an order or payment**. A visible checkout is not a verified
+reservation. Email alerts require local SMTP credentials. Start in dry-run mode.
+
+See [docs/shared-checkout.md](docs/shared-checkout.md) for setup and limitations.
