@@ -14,7 +14,7 @@ services:
       SE_NODE_MAX_SESSIONS: "1"
       SE_NODE_SESSION_TIMEOUT: "86400"
       SE_VNC_NO_PASSWORD: "false"
-      SE_VNC_PASSWORD: "${SNIPER_VNC_PASSWORD:?Set SNIPER_VNC_PASSWORD in .env}"
+      SE_VNC_PASSWORD: "${SNIPER_VNC_PASSWORD:?Set SNIPER_VNC_PASSWORD in .checkout.env}"
     ports:
       - "127.0.0.1:7900:7900"
     volumes:
