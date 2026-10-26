@@ -56,7 +56,7 @@ def fake_selenium(monkeypatch):
     by.By = SimpleNamespace(CSS_SELECTOR='css')
 
     class Wait:
-        def __init__(self, driver, timeout):
+        def __init__(self, driver, timeout, **kwargs):
             self.driver = driver
 
         def until(self, callback):
