@@ -66,7 +66,7 @@ def do_work():
             while paused.is_set() and not stop.is_set():
                 stop.wait(0.5)
             if stop.is_set():
-                return
+                break
             change_state('opening', listing.item_key)
             opened = open_listing_and_click_buy(driver, listing.url, DRY_RUN)
             if not opened:
