@@ -35,7 +35,7 @@ docker compose --env-file .checkout.env -f docker-compose.yml -f docker-compose.
 
 Keep the shared browser open in a browser tab on your computer:
 
-**http://localhost:7900/?autoconnect=1&resize=scale**
+**http://localhost:7900/vnc.html?autoconnect=1&resize=scale**
 
 Authenticate with your VNC password, then log into your Vinted account
 inside that Chromium browser. It is the **same browser** the sniper later
