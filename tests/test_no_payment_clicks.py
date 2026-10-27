@@ -119,3 +119,36 @@ def test_two_ambiguous_buy_buttons_cannot_click():
     with pytest.raises(RuntimeError, match='Mehrere Kaufen-Buttons'):
         browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', False)
     assert buy1.clicks == buy2.clicks == 0
+
+
+def test_buy_deeplink_must_reference_current_item():
+    assert browser._link_matches_item(
+        'https://www.vinted.de/transaction/buy/new?transaction%5Bitem_id%5D=123',
+        'https://vinted.de/items/123-beispiel',
+    )
+    assert not browser._link_matches_item(
+        'https://www.vinted.de/transaction/buy/new?transaction%5Bitem_id%5D=999',
+        'https://www.vinted.de/items/123-beispiel',
+    )
+    assert not browser._link_matches_item(
+        'https://notvinted.example/transaction/buy/new?transaction%5Bitem_id%5D=123',
+        'https://www.vinted.de/items/123-beispiel',
+    )
+
+
+def test_checkout_route_without_verified_dom_is_not_ui_confirmation(monkeypatch):
+    monkeypatch.delenv('SNIPER_CHECKOUT_READY_CSS', raising=False)
+    driver = FakeDriver()
+    driver.current_url = 'https://www.vinted.de/transaction/buy/new'
+    assert not browser.checkout_ui_verified(driver)
+
+
+def test_checkout_verified_marker_requires_visible_element(monkeypatch):
+    monkeypatch.setenv('SNIPER_CHECKOUT_READY_CSS', '.known-checkout-summary')
+    monkeypatch.delenv('SNIPER_CHECKOUT_ERROR_CSS', raising=False)
+    driver = FakeDriver()
+    driver.current_url = 'https://www.vinted.de/transaction/buy/new'
+    driver.controls = [FakeButton('Checkout Summary', driver)]
+    assert browser.checkout_ui_verified(driver)
+    driver.controls = []
+    assert not browser.checkout_ui_verified(driver)
