@@ -14,7 +14,7 @@ from threading import Event, Lock, Thread
 
 from fastapi import FastAPI, HTTPException, Request
 
-from browser import checkout_ui_verified, connect, open_listing_and_click_buy
+from browser import checkout_ui_verified, connect, inspect_buy_controls, open_listing_and_click_buy
 from notify import email_status
 from validation import is_checkout_url, is_vinted_item_url, parse_listing
 
@@ -85,7 +85,12 @@ def do_work():
             opened = open_listing_and_click_buy(driver, listing.url, DRY_RUN)
             if not opened:
                 change_state('dry-run', listing.item_key)
-                email_status(listing, 'TEST – Artikel gefunden', 'Der Kaufbutton wurde NICHT betätigt.')
+                inspection = inspect_buy_controls(driver, listing.url)
+                email_status(
+                    listing,
+                    'TEST – Artikel gefunden',
+                    'Kein Kaufen-Button wurde angeklickt. ' + inspection,
+                )
                 continue
             # A checkout-shaped URL alone is insufficient evidence of a usable UI.
             # No extra clicks, form submissions or payment actions are permitted.
