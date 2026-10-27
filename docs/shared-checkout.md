@@ -129,11 +129,14 @@ It never claims that an item has been reserved.
 
 To enable a stronger *UI-rendered* signal, manually visit a real Vinted checkout
 in the shared browser (without paying), inspect its DOM, and identify a stable
-CSS selector that only occurs once the expected checkout summary is visible.
-Set `SNIPER_CHECKOUT_READY_CSS` in `.checkout.env` to that verified selector.
+TWO different CSS selectors only present in a properly rendered checkout,
+such as separate verified order-summary and delivery sections. Set both
+`SNIPER_CHECKOUT_READY_CSS` and `SNIPER_CHECKOUT_DETAILS_CSS` in
+`.checkout.env` to those manually verified selectors. If either is missing,
+the checkout remains UNVERIFIED.
 Optionally set `SNIPER_CHECKOUT_ERROR_CSS` to a selector for a Vinted checkout
-error banner. Restart only the worker to apply settings. If neither reliable
-selector can be determined, **leave them blank** and use the cautious notice.
+error banner. Restart only the worker to apply settings. If these reliable
+selectors cannot be determined, **leave them blank** and use the cautious notice.
 
 Even a verified checkout UI **does not prove an exclusive reservation**.
 That must be confirmed separately with a permitted, controlled two-account
