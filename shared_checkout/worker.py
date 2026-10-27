@@ -14,7 +14,7 @@ from threading import Event, Lock, Thread
 
 from fastapi import FastAPI, HTTPException, Request
 
-from browser import connect, open_listing_and_click_buy
+from browser import checkout_ui_verified, connect, open_listing_and_click_buy
 from notify import email_status
 from validation import is_checkout_url, is_vinted_item_url, parse_listing
 
@@ -87,12 +87,25 @@ def do_work():
                 change_state('dry-run', listing.item_key)
                 email_status(listing, 'TEST – Artikel gefunden', 'Der Kaufbutton wurde NICHT betätigt.')
                 continue
-            change_state('checkout-open', listing.item_key, 'No further clicks; user controls the shared browser')
+            # A checkout-shaped URL alone is insufficient evidence of a usable UI.
+            # No extra clicks, form submissions or payment actions are permitted.
+            verified = checkout_ui_verified(driver)
+            stage = 'checkout-ui-verified' if verified else 'checkout-url-unverified'
+            change_state(stage, listing.item_key, 'Browser yielded to user; no more automatic clicks')
             email_status(
-                listing, 'Checkout geöffnet – Reservierung unbestätigt',
-                'Die Seite ist im selben Docker-Browser geöffnet. '
-                'Über die bereits geöffnete noVNC-Ansicht übernehmen. '
-                'Der Bot klickt nichts mehr an, bis du die Checkout-Seite verlässt.',
+                listing,
+                (
+                    'Checkout-Oberfläche erkannt – Reservierung unbestätigt'
+                    if verified else 'Checkout-URL erreicht – Oberfläche UNBESTÄTIGT'
+                ),
+                (
+                    'Der sichtbare Checkout-Marker wurde erkannt.'
+                    if verified else
+                    'Nur der Checkout-Pfad wurde erkannt. Bitte manuell im selben Browser '
+                    'prüfen, ob ein nutzbarer Checkout oder eine Fehlermeldung angezeigt wird.'
+                )
+                + ' Die gemeinsame Browseransicht bleibt geöffnet. '
+                + 'Der Bot führt keine weiteren Klicks aus, bis du die Seite verlässt.',
             )
             while not stop.is_set():
                 if not is_checkout_url(driver.current_url):
