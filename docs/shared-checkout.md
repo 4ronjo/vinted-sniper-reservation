@@ -120,3 +120,28 @@ checkout immediately; clicking the view link in an email also opens the **same
 remote browser instance**, not a new checkout session. For access from your phone,
 set up private authenticated VPN access (e.g., Tailscale); localhost URLs work
 only on the computer running Docker.
+
+## Checkout verification (critical)
+
+The checkout URL alone is **not evidence** that the purchase screen is usable.
+By default the worker reports `Checkout-URL erreicht – Oberfläche UNBESTÄTIGT`.
+It never claims that an item has been reserved.
+
+To enable a stronger *UI-rendered* signal, manually visit a real Vinted checkout
+in the shared browser (without paying), inspect its DOM, and identify a stable
+CSS selector that only occurs once the expected checkout summary is visible.
+Set `SNIPER_CHECKOUT_READY_CSS` in `.checkout.env` to that verified selector.
+Optionally set `SNIPER_CHECKOUT_ERROR_CSS` to a selector for a Vinted checkout
+error banner. Restart only the worker to apply settings. If neither reliable
+selector can be determined, **leave them blank** and use the cautious notice.
+
+Even a verified checkout UI **does not prove an exclusive reservation**.
+That must be confirmed separately with a permitted, controlled two-account
+seller/buyer test or Vinted-provided explicit reservation state, observing
+whether the second participant can still buy before and after opening checkout.
+Never finalize an order during this test. If no authoritative observation is
+possible, keep the status `reservation unverified`.
+
+The buy control is only clicked when exactly one safe listing-level candidate
+exists; checkout links must contain the current listing ID. If Vinted changes
+its markup, the worker fails rather than guessing a payment-related control.
