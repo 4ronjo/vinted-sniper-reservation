@@ -57,7 +57,7 @@ def _link_matches_item(href: str, item_url: str) -> bool:
     match = ITEM_PATH.match(listing.path)
     return bool(
         match
-        and link.hostname == listing.hostname
+        and (link.hostname or '').removeprefix('www.') == (listing.hostname or '').removeprefix('www.')
         and parse_qs(link.query).get('transaction[item_id]') == [match.group(1)]
     )
 
