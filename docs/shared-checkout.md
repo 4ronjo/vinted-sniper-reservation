@@ -148,3 +148,20 @@ possible, keep the status `reservation unverified`.
 The buy control is only clicked when exactly one safe listing-level candidate
 exists; checkout links must contain the current listing ID. If Vinted changes
 its markup, the worker fails rather than guessing a payment-related control.
+
+## Buy-button dry-run diagnostics
+
+With `SNIPER_CHECKOUT_DRY_RUN=true`, incoming listings are opened but NO
+button is clicked. A read-only audit records the number of visible controls
+labeled exactly like Kaufen/Buy, and how many are eligible under the strict
+safety rules. You will receive this summary in the test email.
+
+- `safely eligible: 1` means one potentially actionable control was
+  identified; it is **not** proof the live checkout will work.
+- `safely eligible: 0` means a manual review of the live site's HTML is
+  required. Do not remove payment-safety exclusions just to force a click.
+- More than one eligible control means the bot deliberately refuses to click.
+
+This diagnostic does not read card details, credentials or payment forms.
+Inspect the actual Vinted listing/checkout within your own noVNC session
+before configuring the two checkout verification selectors.
