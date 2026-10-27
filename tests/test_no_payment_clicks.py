@@ -163,3 +163,23 @@ def test_single_checkout_marker_never_confirms_ui(monkeypatch):
     driver.current_url = 'https://www.vinted.de/transaction/buy/new'
     driver.controls = [FakeButton('Checkout Summary', driver)]
     assert not browser.checkout_ui_verified(driver)
+
+
+def test_dry_run_inspection_reports_safe_button_but_does_not_click():
+    driver = FakeDriver()
+    button = FakeButton('Kaufen', driver)
+    driver.current_url = 'https://www.vinted.de/items/123-example'
+    driver.controls = [button]
+    report = browser.inspect_buy_controls(driver, driver.current_url)
+    assert 'safely eligible: 1' in report
+    assert button.clicks == 0
+
+
+def test_dry_run_inspection_excludes_payment_button():
+    driver = FakeDriver()
+    payment = FakeButton('Zahlungspflichtig bestellen', driver)
+    driver.current_url = 'https://www.vinted.de/items/123-example'
+    driver.controls = [payment]
+    report = browser.inspect_buy_controls(driver, driver.current_url)
+    assert 'safely eligible: 0' in report
+    assert payment.clicks == 0
