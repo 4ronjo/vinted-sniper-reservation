@@ -3,9 +3,11 @@
 NEVER submit payments: this module clicks at most an explicitly named *listing*
 buy button and will never click a button, link or form in checkout.
 """
+import os
 import re
+from urllib.parse import parse_qs, urlsplit
 
-from validation import BUY_TEXTS, is_checkout_url, is_vinted_item_url
+from validation import BUY_TEXTS, ITEM_PATH, is_checkout_url, is_vinted_item_url
 
 
 def connect(grid_url: str, home_url: str):
@@ -20,6 +22,44 @@ def connect(grid_url: str, home_url: str):
     driver.set_page_load_timeout(25)
     driver.get(home_url)
     return driver
+
+
+
+def checkout_ui_verified(driver) -> bool:
+    """Require an operator-validated checkout-only DOM marker.
+
+    Without a known stable marker from an actual Vinted checkout, a matching
+    URL is *unverified*, not proof that checkout has rendered.
+    """
+    from selenium.webdriver.common.by import By
+
+    if not is_checkout_url(driver.current_url):
+        return False
+    ready_css = os.getenv('SNIPER_CHECKOUT_READY_CSS', '').strip()
+    error_css = os.getenv('SNIPER_CHECKOUT_ERROR_CSS', '').strip()
+    if error_css and any(
+        el.is_displayed() for el in driver.find_elements(By.CSS_SELECTOR, error_css)
+    ):
+        return False
+    if not ready_css:
+        return False
+    return any(
+        el.is_displayed() for el in driver.find_elements(By.CSS_SELECTOR, ready_css)
+    )
+
+
+def _link_matches_item(href: str, item_url: str) -> bool:
+    """Avoid redirecting a matching-label link to another listing's checkout."""
+    if not is_checkout_url(href):
+        return False
+    link = urlsplit(href)
+    listing = urlsplit(item_url)
+    match = ITEM_PATH.match(listing.path)
+    return bool(
+        match
+        and link.hostname == listing.hostname
+        and parse_qs(link.query).get('transaction[item_id]') == [match.group(1)]
+    )
 
 
 def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
@@ -58,7 +98,7 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
                 if (el.get_attribute('type') or '').lower() == 'submit':
                     continue
             elif tag == 'a':
-                if not is_checkout_url(el.get_attribute('href') or ''):
+                if not _link_matches_item(el.get_attribute('href') or '', url):
                     continue
             else:
                 continue
