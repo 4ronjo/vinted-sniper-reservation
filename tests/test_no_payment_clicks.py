@@ -138,6 +138,7 @@ def test_buy_deeplink_must_reference_current_item():
 
 def test_checkout_route_without_verified_dom_is_not_ui_confirmation(monkeypatch):
     monkeypatch.delenv('SNIPER_CHECKOUT_READY_CSS', raising=False)
+    monkeypatch.delenv('SNIPER_CHECKOUT_DETAILS_CSS', raising=False)
     driver = FakeDriver()
     driver.current_url = 'https://www.vinted.de/transaction/buy/new'
     assert not browser.checkout_ui_verified(driver)
@@ -145,10 +146,20 @@ def test_checkout_route_without_verified_dom_is_not_ui_confirmation(monkeypatch)
 
 def test_checkout_verified_marker_requires_visible_element(monkeypatch):
     monkeypatch.setenv('SNIPER_CHECKOUT_READY_CSS', '.known-checkout-summary')
+    monkeypatch.setenv('SNIPER_CHECKOUT_DETAILS_CSS', '.known-shipping-section')
     monkeypatch.delenv('SNIPER_CHECKOUT_ERROR_CSS', raising=False)
     driver = FakeDriver()
     driver.current_url = 'https://www.vinted.de/transaction/buy/new'
     driver.controls = [FakeButton('Checkout Summary', driver)]
     assert browser.checkout_ui_verified(driver)
     driver.controls = []
+    assert not browser.checkout_ui_verified(driver)
+
+
+def test_single_checkout_marker_never_confirms_ui(monkeypatch):
+    monkeypatch.setenv('SNIPER_CHECKOUT_READY_CSS', '.known-checkout-summary')
+    monkeypatch.delenv('SNIPER_CHECKOUT_DETAILS_CSS', raising=False)
+    driver = FakeDriver()
+    driver.current_url = 'https://www.vinted.de/transaction/buy/new'
+    driver.controls = [FakeButton('Checkout Summary', driver)]
     assert not browser.checkout_ui_verified(driver)
