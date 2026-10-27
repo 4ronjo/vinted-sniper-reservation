@@ -36,15 +36,18 @@ def checkout_ui_verified(driver) -> bool:
     if not is_checkout_url(driver.current_url):
         return False
     ready_css = os.getenv('SNIPER_CHECKOUT_READY_CSS', '').strip()
+    details_css = os.getenv('SNIPER_CHECKOUT_DETAILS_CSS', '').strip()
     error_css = os.getenv('SNIPER_CHECKOUT_ERROR_CSS', '').strip()
     if error_css and any(
         el.is_displayed() for el in driver.find_elements(By.CSS_SELECTOR, error_css)
     ):
         return False
-    if not ready_css:
+    # Two independently verified checkout-only sections are required.
+    if not ready_css or not details_css or ready_css == details_css:
         return False
-    return any(
-        el.is_displayed() for el in driver.find_elements(By.CSS_SELECTOR, ready_css)
+    return all(
+        any(el.is_displayed() for el in driver.find_elements(By.CSS_SELECTOR, selector))
+        for selector in (ready_css, details_css)
     )
 
 
