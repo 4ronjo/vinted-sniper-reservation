@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # --- Polling -------------------------------------------------------------------
     poll_default_interval_s: int = Field(
-        default=60,
+        default=10,
         ge=MIN_POLL_INTERVAL_S,
         description="Default seconds between checks for a new search. Per-search overrides "
         "live in the database.",

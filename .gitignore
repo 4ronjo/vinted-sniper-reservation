@@ -18,3 +18,7 @@ data/
 *.db-shm
 
 .DS_Store
+
+# Shared browser checkout configuration and local session secrets
+.checkout.env
+checkout-data/

@@ -12,3 +12,8 @@ tests/
 .pytest_cache/
 __pycache__/
 *.db
+
+# Checkout private credentials and browser session (never copy into images)
+.checkout.env
+checkout-data/
+checkout-data/**
