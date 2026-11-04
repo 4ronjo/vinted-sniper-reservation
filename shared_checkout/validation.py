@@ -1,7 +1,7 @@
 """Validate webhook listing inputs before passing them to an interactive browser."""
+import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-import re
 from urllib.parse import urlsplit
 
 ALLOWED_TLDS = frozenset({
@@ -29,7 +29,12 @@ class Listing:
 def is_vinted_item_url(value: str) -> bool:
     try:
         parsed = urlsplit(value)
-        if parsed.scheme != 'https' or parsed.username or parsed.password or parsed.port not in (None, 443):
+        if (
+            parsed.scheme != "https"
+            or parsed.username
+            or parsed.password
+            or parsed.port not in (None, 443)
+        ):
             return False
         if parsed.fragment:
             return False
@@ -45,7 +50,15 @@ def is_checkout_url(value: str) -> bool:
     try:
         parsed = urlsplit(value)
         host = (parsed.hostname or '').lower().removeprefix('www.')
-        return parsed.scheme == 'https' and host.startswith('vinted.') and host[7:] in ALLOWED_TLDS and parsed.username is None and parsed.password is None and parsed.port in (None, 443) and bool(CHECKOUT_PATH.match(parsed.path))
+        return (
+            parsed.scheme == "https"
+            and host.startswith("vinted.")
+            and host[7:] in ALLOWED_TLDS
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port in (None, 443)
+            and bool(CHECKOUT_PATH.match(parsed.path))
+        )
     except ValueError:
         return False
 
