@@ -29,6 +29,7 @@ GRID_URL = os.getenv('SNIPER_SELENIUM_URL', 'http://browser:4444/wd/hub')
 HOME_URL = os.getenv('SNIPER_VINTED_HOME', 'https://www.vinted.de')
 seen: set[str] = set()
 paused = Event()
+auth_ready = Event()  # Never navigate until the user finishes login + any 2FA
 lock = Lock()
 stop = Event()
 state = {'stage': 'starting', 'item': None, 'message': ''}
@@ -47,12 +48,23 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
             try:
                 change_state('browser-connecting')
                 driver = connect(GRID_URL, HOME_URL)
-                change_state('ready', message='Log in via the shared noVNC browser')
+                auth_ready.clear()
+                change_state(
+                    'awaiting-manual-login',
+                    message='Log in via noVNC, enter any SMS/email code, then confirm login',
+                )
             except Exception:
                 LOG.exception('Browser not yet ready')
                 change_state('browser-not-ready')
                 stop.wait(5)
                 continue
+        if not auth_ready.is_set():
+            change_state(
+                'awaiting-manual-login',
+                message='Automated navigation blocked until manual login is confirmed',
+            )
+            stop.wait(0.5)
+            continue
         if paused.is_set():
             change_state('paused', message='Manual browser control - no automatic navigation')
             stop.wait(0.5)
@@ -74,7 +86,7 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
             continue
         try:
             # A pause may have arrived while fetching the next item.
-            while paused.is_set() and not stop.is_set():
+            while (paused.is_set() or not auth_ready.is_set()) and not stop.is_set():
                 stop.wait(0.5)
             if stop.is_set():
                 break
@@ -126,6 +138,9 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
             LOG.exception('Checkout failed')
             change_state('failed', listing.item_key, str(exc))
             email_status(listing, 'Checkout fehlgeschlagen', str(exc))
+            # Fail closed after an authentication challenge; never collect OTPs in logs.
+            if 'Konto nicht angemeldet' in str(exc):
+                auth_ready.clear()
             try:
                 _ = driver.current_url
             except Exception:  # noqa: BLE001 - Selenium may disconnect for many reasons
@@ -168,6 +183,8 @@ def health():
         'queued': QUEUE.qsize(),
         'dry_run': DRY_RUN,
         'paused': paused.is_set(),
+        'login_confirmed_by_user': auth_ready.is_set(),
+        'login_note': 'Manual confirmation only; does not prove platform authentication',
     }
 
 
@@ -219,3 +236,24 @@ def resume_browser(secret: str):
         raise HTTPException(status_code=403, detail='Invalid token')
     paused.clear()
     return {'paused': False}
+
+
+@app.post('/control/login-confirmed/{secret}')
+def confirm_manual_login(secret: str):
+    """User acknowledges completing all Vinted login/2FA steps in the shared browser."""
+    if not SECRET or not hmac.compare_digest(secret, SECRET):
+        raise HTTPException(status_code=403, detail='Invalid token')
+    auth_ready.set()
+    return {
+        'login_confirmed_by_user': True,
+        'warning': 'Acknowledgement only; the worker never reads SMS or email codes',
+    }
+
+
+@app.post('/control/login-required/{secret}')
+def require_manual_login(secret: str):
+    """Pause worker navigation to permit another manual authentication challenge."""
+    if not SECRET or not hmac.compare_digest(secret, SECRET):
+        raise HTTPException(status_code=403, detail='Invalid token')
+    auth_ready.clear()
+    return {'login_confirmed_by_user': False}
