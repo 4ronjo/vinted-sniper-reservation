@@ -1,7 +1,7 @@
 """Tests for the strict buy-only click boundary without requiring Selenium."""
+import sys
 from importlib import import_module
 from pathlib import Path
-import sys
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -78,7 +78,10 @@ def test_dry_run_cannot_click_anything():
     driver = FakeDriver()
     buy = FakeButton('Kaufen', driver)
     driver.controls = [buy]
-    assert browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', True) is False
+    assert (
+        browser.open_listing_and_click_buy(driver, 'https://www.vinted.de/items/123', True)
+        is False
+    )
     assert buy.clicks == 0
 
 
