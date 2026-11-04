@@ -1,8 +1,9 @@
 """Optional SMTP alerts; failures never cause any purchase actions."""
-from email.message import EmailMessage
 import logging
 import os
 import smtplib
+from email.message import EmailMessage
+
 from validation import Listing
 
 LOG = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def email_status(item: Listing, status: str, details: str) -> None:
     msg = EmailMessage()
     msg['From'] = user
     msg['To'] = destination
-    msg['Subject'] = f'Vinted: {status} – {item.title}'
+    msg['Subject'] = f'Vinted: {status} - {item.title}'
     viewer_url = os.getenv('SNIPER_CHECKOUT_VIEW_URL', 'http://localhost:7900/vnc.html?autoconnect=1&resize=scale')
     msg.set_content(
         f'Browseransicht (derselbe Checkout, kein neues Vinted-Fenster): {viewer_url}\n\n'
