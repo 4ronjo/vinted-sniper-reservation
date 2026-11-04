@@ -21,6 +21,13 @@ or so and tells you about listings that weren't there before. That's the whole i
   <img src="docs/media/demo.gif" width="820" alt="Adding a search by pasting a Vinted URL, the saved searches with their health, and the listings arriving in Discord and Telegram">
 </div>
 
+> **Fork note:** The Quickstart directly below describes the original
+> **search-and-notify** application and links to upstream files.
+> For the separate Docker checkout experiment in **this fork**, see
+> [Experimental shared checkout](#experimental-shared-checkout-fork-specific).
+> Apple sign-in currently fails in the reported Selenium browser environment;
+> do not treat the optional checkout feature as operational.
+
 ## Quickstart
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux: [Docker Engine](https://docs.docker.com/engine/install/)).
