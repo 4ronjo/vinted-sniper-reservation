@@ -12,14 +12,14 @@ from decimal import Decimal
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 
-from fastapi import FastAPI, HTTPException, Request
-
 from browser import checkout_ui_verified, connect, inspect_buy_controls, open_listing_and_click_buy
+from fastapi import FastAPI, HTTPException, Request
 from notify import email_status
 from validation import is_checkout_url, is_vinted_item_url, parse_listing
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger('shared_checkout')
+MIN_WEBHOOK_SECRET_LENGTH = 24
 SECRET = os.getenv('SNIPER_CHECKOUT_WEBHOOK_TOKEN', '')
 QUEUE = Queue(maxsize=min(25, max(1, int(os.getenv('SNIPER_CHECKOUT_QUEUE_SIZE', '10')))))
 LIMIT_STR = os.getenv('SNIPER_CHECKOUT_MAX_TOTAL_EUR', '').strip()
@@ -40,7 +40,7 @@ def change_state(stage: str, item: str | None = None, message: str = '') -> None
     LOG.info('State %s item=%s %s', stage, item, message)
 
 
-def do_work():
+def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout state machine
     driver = None
     while not stop.is_set():
         if driver is None:
@@ -54,15 +54,18 @@ def do_work():
                 stop.wait(5)
                 continue
         if paused.is_set():
-            change_state('paused', message='Manual browser control – no automatic navigation')
+            change_state('paused', message='Manual browser control - no automatic navigation')
             stop.wait(0.5)
             continue
         try:
             if is_checkout_url(driver.current_url):
-                change_state('manual-checkout-protected', message='Existing checkout is not overwritten')
+                change_state(
+                    'manual-checkout-protected',
+                    message='Existing checkout is not overwritten',
+                )
                 stop.wait(1)
                 continue
-        except Exception:
+        except Exception:  # noqa: BLE001 - Selenium may disconnect for many reasons
             driver = None
             continue
         try:
@@ -88,7 +91,7 @@ def do_work():
                 inspection = inspect_buy_controls(driver, listing.url)
                 email_status(
                     listing,
-                    'TEST – Artikel gefunden',
+                    'TEST - Artikel gefunden',
                     'Kein Kaufen-Button wurde angeklickt. ' + inspection,
                 )
                 continue
@@ -96,12 +99,14 @@ def do_work():
             # No extra clicks, form submissions or payment actions are permitted.
             verified = checkout_ui_verified(driver)
             stage = 'checkout-ui-verified' if verified else 'checkout-url-unverified'
-            change_state(stage, listing.item_key, 'Browser yielded to user; no more automatic clicks')
+            change_state(
+                stage, listing.item_key, 'Browser yielded to user; no more automatic clicks'
+            )
             email_status(
                 listing,
                 (
-                    'Checkout-Oberfläche erkannt – Reservierung unbestätigt'
-                    if verified else 'Checkout-URL erreicht – Oberfläche UNBESTÄTIGT'
+                    'Checkout-Oberfläche erkannt - Reservierung unbestätigt'
+                    if verified else 'Checkout-URL erreicht - Oberfläche UNBESTÄTIGT'
                 ),
                 (
                     'Der sichtbare Checkout-Marker wurde erkannt.'
@@ -123,7 +128,7 @@ def do_work():
             email_status(listing, 'Checkout fehlgeschlagen', str(exc))
             try:
                 _ = driver.current_url
-            except Exception:
+            except Exception:  # noqa: BLE001 - Selenium may disconnect for many reasons
                 driver = None
         finally:
             QUEUE.task_done()
@@ -137,8 +142,8 @@ def do_work():
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    if len(SECRET) < 24:
+async def lifespan(_app: FastAPI):
+    if len(SECRET) < MIN_WEBHOOK_SECRET_LENGTH:
         raise RuntimeError('Configure SNIPER_CHECKOUT_WEBHOOK_TOKEN (at least 24 characters)')
     if not is_vinted_item_url(HOME_URL.rstrip('/') + '/items/1'):
         raise RuntimeError('SNIPER_VINTED_HOME must be a permitted Vinted domain')
@@ -158,11 +163,16 @@ app = FastAPI(title='Vinted Shared Browser', lifespan=lifespan)
 def health():
     with lock:
         current = state.copy()
-    return {'status': current, 'queued': QUEUE.qsize(), 'dry_run': DRY_RUN, 'paused': paused.is_set()}
+    return {
+        'status': current,
+        'queued': QUEUE.qsize(),
+        'dry_run': DRY_RUN,
+        'paused': paused.is_set(),
+    }
 
 
 @app.post('/hook/{secret}')
-async def webhook(secret: str, request: Request):
+async def webhook(secret: str, request: Request):  # noqa: C901 - validate each input boundary
     if not SECRET or not hmac.compare_digest(secret, SECRET):
         raise HTTPException(status_code=403, detail='Invalid token')
     raw = await request.body()
