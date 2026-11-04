@@ -207,3 +207,35 @@ will not fix a missing Docker Compose command.
 
 If `git clone` says the destination directory already exists, don't clone
 again: run `cd ~/vinted-sniper-reservation && git pull --ff-only`.
+
+## Mac: missing docker-credential-desktop during image pulls
+
+If Docker Compose starts building but fails while downloading a base image with
+`exec: "docker-credential-desktop": executable file not found in $PATH`,
+this is a **local Docker Desktop credential helper issue**. It occurs before
+our app is built and cannot be corrected by editing the Sniper's Dockerfile.
+
+Check whether the helper is installed under the user CLI directory or inside
+the Docker Desktop app bundle:
+
+```bash
+ls -l "$HOME/.docker/bin/docker-credential-desktop" \
+  /Applications/Docker.app/Contents/Resources/bin/docker-credential-desktop 2>/dev/null
+command -v docker-credential-desktop
+```
+
+If present but not found, in the current terminal session run:
+
+```bash
+export PATH="$HOME/.docker/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+command -v docker-credential-desktop
+```
+
+Then retry the Docker Compose build. For a permanent fix, update your shell's
+PATH or use **Docker Desktop > Settings > Advanced > CLI tools installation**.
+If neither location contains the helper, repair the Docker Desktop CLI install.
+
+A temporary alternative for **public** images is to back up `~/.docker/config.json`
+and remove the stale top-level `credsStore: desktop` setting, but that changes
+credential handling for future `docker login` commands; restoring the helper
+is preferable. Never rename `credsStore` to an unsupported key.
