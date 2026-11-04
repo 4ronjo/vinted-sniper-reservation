@@ -11,8 +11,8 @@ from validation import BUY_TEXTS, ITEM_PATH, is_checkout_url, is_vinted_item_url
 
 
 def connect(grid_url: str, home_url: str):
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
+    from selenium import webdriver  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium.webdriver.chrome.options import Options  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
 
     options = Options()
     options.add_argument('--window-size=1440,900')
@@ -31,7 +31,7 @@ def checkout_ui_verified(driver) -> bool:
     Without a known stable marker from an actual Vinted checkout, a matching
     URL is *unverified*, not proof that checkout has rendered.
     """
-    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
 
     if not is_checkout_url(driver.current_url):
         return False
@@ -60,15 +60,23 @@ def _link_matches_item(href: str, item_url: str) -> bool:
     match = ITEM_PATH.match(listing.path)
     return bool(
         match
-        and (link.hostname or '').removeprefix('www.') == (listing.hostname or '').removeprefix('www.')
+        and (link.hostname or "").removeprefix("www.")
+        == (listing.hostname or "").removeprefix("www.")
         and parse_qs(link.query).get('transaction[item_id]') == [match.group(1)]
     )
 
 
 
+def _control_label(element) -> str:
+    """Normalize the text of an interactive element for exact matching."""
+    return re.sub(
+        r"\\s+", " ", (element.text or element.get_attribute("aria-label") or "").strip()
+    ).casefold()
+
+
 def inspect_buy_controls(driver, item_url: str) -> str:
     """Read-only listing button audit; NEVER clicks or submits forms."""
-    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
 
     matching = 0
     safe = 0
@@ -108,10 +116,10 @@ def inspect_buy_controls(driver, item_url: str) -> str:
     )
 
 
-def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
+def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:  # noqa: C901, PLR0912
     """Return True only if checkout has been reached (never complete purchase)."""
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium.webdriver.support.ui import WebDriverWait  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
 
     driver.get(url)  # same browser window, never a new window or tab
     if not is_vinted_item_url(driver.current_url):
@@ -125,7 +133,7 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
         WebDriverWait(driver, 8, poll_frequency=0.25).until(
             lambda d: any(
                 el.is_displayed() and el.is_enabled()
-                and re.sub(r'\s+', ' ', (el.text or el.get_attribute('aria-label') or '').strip()).casefold() in BUY_TEXTS
+                and _control_label(el) in BUY_TEXTS
                 for el in d.find_elements(By.CSS_SELECTOR, 'button, a')
             )
         )
@@ -135,7 +143,7 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
         try:
             if not (el.is_displayed() and el.is_enabled()):
                 continue
-            label = re.sub(r'\s+', ' ', (el.text or el.get_attribute('aria-label') or '').strip()).casefold()
+            label = _control_label(el)
             if label not in BUY_TEXTS:
                 continue
             # Fail closed: do not submit forms or click arbitrary role buttons.
@@ -156,7 +164,7 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:
             candidate = el
         except RuntimeError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - stale Selenium nodes must fail closed
             continue
     if candidate is None:
         raise RuntimeError('Kein eindeutiger Kaufen-Button im selben Fenster gefunden')
