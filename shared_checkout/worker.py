@@ -138,9 +138,10 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
             LOG.exception('Checkout failed')
             change_state('failed', listing.item_key, str(exc))
             email_status(listing, 'Checkout fehlgeschlagen', str(exc))
-            # Fail closed after an authentication challenge; never collect OTPs in logs.
-            if 'Konto nicht angemeldet' in str(exc):
-                auth_ready.clear()
+            # Fail closed after any failed checkout attempt: the user's browser may
+            # display login/2FA or a changed site. Require explicit manual review.
+            # Never capture a password, email challenge or one-time code.
+            auth_ready.clear()
             try:
                 _ = driver.current_url
             except Exception:  # noqa: BLE001 - Selenium may disconnect for many reasons
