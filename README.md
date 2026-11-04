@@ -84,9 +84,81 @@ MIT licensed. Contributions welcome — especially bug reports with logs attache
 
 ## Experimental shared checkout (fork-specific)
 
-This fork also contains an optional Docker Selenium/noVNC checkout worker. It can
-open the listing-page **Kaufen** flow in a single browser shared with the user,
-but **never submits an order or payment**. A visible checkout is not a verified
-reservation. Email alerts require local SMTP credentials. Start in dry-run mode.
+> **Experimental; not production-ready.** The upstream search-and-notify app
+> works separately from this optional add-on. The optional checkout workflow
+> has **not** been verified end to end on Vinted. In particular, an open
+> checkout does **not** establish that a listing is reserved.
 
-See [docs/shared-checkout.md](docs/shared-checkout.md) for setup and limitations.
+### Current verified status (4 November 2026)
+
+| Component | Status |
+| --- | --- |
+| Search dashboard (`http://localhost:8000`) | Started successfully in a local Docker run |
+| Selenium Chromium / noVNC (`http://localhost:7900`) | Container started |
+| Checkout worker (`http://localhost:8765/health`) | Running and awaiting manual login |
+| Python safety tests | 15 passed before the latest additional test; rerun locally |
+| Vinted account login via **Sign in with Apple** in Selenium Chromium | **Blocked**: Apple/Vinted identity verification failed in the reported environment |
+| Real checkout, exclusive reservation and email delivery | **Not yet verified** |
+
+The Selenium-based browser uses **one shared Chromium session** controlled
+through noVNC. It does not share Safari's or your ordinary browser's
+existing login. The worker has exactly one intended automated action:
+click a safely identified **Kaufen** button on a listing when dry-run is
+disabled. **It does not complete orders or submit payments.** Do not enable
+live clicking until you have verified the browser login and tested the
+workflow.
+
+### Getting started with the fork
+
+Unlike the upstream Quickstart above, this add-on requires a **local build**
+and a private configuration file:
+
+```bash
+git clone https://github.com/4ronjo/vinted-sniper-reservation.git
+cd vinted-sniper-reservation
+git switch feature/checkout-snipe-email
+cp checkout.env.example .checkout.env
+# Edit .checkout.env locally: VNC password, random webhook token,
+# optional sender SMTP credentials. Leave DRY_RUN=true.
+docker compose --env-file .checkout.env \
+  -f docker-compose.yml -f docker-compose.checkout.yml up -d --build
+docker compose --env-file .checkout.env \
+  -f docker-compose.yml -f docker-compose.checkout.yml ps
+curl -sS http://127.0.0.1:8765/health
+```
+
+For an existing clone, use `git pull --ff-only` instead of cloning again.
+The regular dashboard is at `http://localhost:8000`, and the shared
+browser is at
+`http://localhost:7900/vnc.html?autoconnect=1&resize=scale`.
+Both are exposed on the local machine only.
+
+**Manual login, including Apple / 2FA:** Sign in inside the noVNC Chromium
+window and manually complete any authorized SMS or email challenge. The
+worker starts at `awaiting-manual-login` and will not process listings
+until you explicitly confirm the completed login through
+`POST /control/login-confirmed/{your-webhook-token}`. This is a manual
+acknowledgment, **not an automatic verification of session validity**.
+
+**Known blocker:** A reported attempt to sign in to Vinted using
+**Sign in with Apple** inside the Selenium-managed Chromium browser
+failed with an identity-verification error. No code change has resolved
+that login problem. If Apple or Vinted refuses the login, **do not**
+confirm it in the worker, import Safari cookies, supply passwords or
+one-time codes to the bot, or attempt to bypass the verification.
+Instead, use the ordinary search/notification workflow and complete
+any purchase manually in your normal browser. That fallback **does not**
+preserve the exact same checkout session.
+
+The default polling interval is 10 seconds for newly created searches;
+existing saved searches retain their stored intervals. The checkout
+worker's detection and email notifications are separate from the base
+searcher, and SMTP delivery still needs a successful local test.
+
+**Do not commit** `.checkout.env`, account credentials, browser profiles,
+OTP codes, or session cookies. The Docker images and Vinted login
+have not received a full end-to-end integration test. Automated access
+may violate Vinted's terms.
+
+For detailed setup, controls, known limitations, and macOS Docker
+troubleshooting, see **[shared checkout documentation](docs/shared-checkout.md)**.
