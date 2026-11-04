@@ -11,8 +11,8 @@ from validation import BUY_TEXTS, ITEM_PATH, is_checkout_url, is_vinted_item_url
 
 
 def connect(grid_url: str, home_url: str):
-    from selenium import webdriver  # noqa: PLC0415 - Selenium is optional for isolated tests
-    from selenium.webdriver.chrome.options import Options  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium import webdriver  # noqa: PLC0415
+    from selenium.webdriver.chrome.options import Options  # noqa: PLC0415
 
     options = Options()
     options.add_argument('--window-size=1440,900')
@@ -31,7 +31,7 @@ def checkout_ui_verified(driver) -> bool:
     Without a known stable marker from an actual Vinted checkout, a matching
     URL is *unverified*, not proof that checkout has rendered.
     """
-    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
 
     if not is_checkout_url(driver.current_url):
         return False
@@ -70,13 +70,13 @@ def _link_matches_item(href: str, item_url: str) -> bool:
 def _control_label(element) -> str:
     """Normalize the text of an interactive element for exact matching."""
     return re.sub(
-        r"\\s+", " ", (element.text or element.get_attribute("aria-label") or "").strip()
+        r"\s+", " ", (element.text or element.get_attribute("aria-label") or "").strip()
     ).casefold()
 
 
 def inspect_buy_controls(driver, item_url: str) -> str:
     """Read-only listing button audit; NEVER clicks or submits forms."""
-    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
 
     matching = 0
     safe = 0
@@ -107,7 +107,7 @@ def inspect_buy_controls(driver, item_url: str) -> str:
                 safe += 1
             else:
                 reasons.append('unsupported element')
-        except Exception:
+        except Exception:  # noqa: BLE001 - DOM nodes can change during inspection
             reasons.append('element changed while inspecting')
     return (
         f'Buy-label controls: {matching}; safely eligible: {safe}; '
@@ -118,8 +118,8 @@ def inspect_buy_controls(driver, item_url: str) -> str:
 
 def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:  # noqa: C901, PLR0912
     """Return True only if checkout has been reached (never complete purchase)."""
-    from selenium.webdriver.common.by import By  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
-    from selenium.webdriver.support.ui import WebDriverWait  # noqa: PLC0415 - Selenium is optional for isolated tests  # noqa: PLC0415 - Selenium is optional for isolated tests
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
+    from selenium.webdriver.support.ui import WebDriverWait  # noqa: PLC0415
 
     driver.get(url)  # same browser window, never a new window or tab
     if not is_vinted_item_url(driver.current_url):
