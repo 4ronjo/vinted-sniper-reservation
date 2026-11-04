@@ -1,9 +1,9 @@
 import sys
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'shared_checkout'))
-from validation import is_vinted_item_url, is_checkout_url, parse_listing
+from validation import is_checkout_url, is_vinted_item_url, parse_listing
 
 
 def test_vinted_link_validation():
@@ -22,7 +22,8 @@ def test_checkout_url_validation():
 
 
 def test_price_filter_and_item_key():
-    item = dict(url='https://www.vinted.de/items/120-pokemon', title='Pokemon', total_price='34.90')
+    item = {'url': 'https://www.vinted.de/items/120-pokemon',
+            'title': 'Pokemon', 'total_price': '34.90'}
     assert parse_listing(item, 'Pokemon', Decimal('35')).item_key == 'www.vinted.de:120'
     assert parse_listing(item, 'Pokemon', Decimal('34')) is None
     assert parse_listing(item, 'Pokemon', None).total == Decimal('34.90')
@@ -30,4 +31,7 @@ def test_price_filter_and_item_key():
 
 def test_bad_payload():
     assert parse_listing({'url': 'https://bad.com/items/1'}, 'x', None) is None
-    assert parse_listing({'url': 'https://vinted.de/items/1', 'price': 'NaN-a-number'}, 'x', None) is None
+    assert (
+        parse_listing({'url': 'https://vinted.de/items/1', 'price': 'NaN-a-number'}, 'x', None)
+        is None
+    )
