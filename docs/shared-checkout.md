@@ -41,6 +41,27 @@ Authenticate with your VNC password, then log into your Vinted account
 inside that Chromium browser. It is the **same browser** the sniper later
 uses; it does not open a second checkout in a separate local window.
 
+**Manual SMS/email verification:** Vinted can require a one-time code when
+signing in. Read the code on your own phone or in your linked mailbox and
+enter it **directly into the Vinted page** in the shared noVNC browser.
+Neither the phone number nor the code needs to be configured in this project.
+The worker **will not navigate to new listings until you explicitly confirm**
+that the login (including any verification challenge) is finished:
+
+```bash
+TOKEN=$(sed -n 's/^SNIPER_CHECKOUT_WEBHOOK_TOKEN=//p' .checkout.env)
+curl -X POST "http://127.0.0.1:8765/control/login-confirmed/$TOKEN"
+curl -s http://127.0.0.1:8765/health
+```
+
+Health should report `login_confirmed_by_user: true`. This is your manual
+acknowledgment, **not automatic proof** that Vinted accepted your login.
+If you later encounter a fresh verification or login prompt, use
+`/control/login-required/$TOKEN`, complete it manually, and confirm again.
+Any failed automated checkout attempt automatically returns to the manual
+review gate. **Never put codes or credentials into GitHub, logs or chat.**
+
+
 The original search dashboard is at http://localhost:8000.
 
 ## 3. Connect saved searches
@@ -55,7 +76,7 @@ Replace the last segment with the same secret configured above, then route
 your chosen saved searches to it. The existing search filters and max total
 price rules still apply.
 
-To test: create a saved search and wait for a new matching article. In dry run,
+To test: finish the login confirmation first, then create a saved search and wait for a new matching article. In dry run,
 the worker only visits the listing and sends a test email.
 
 When the dry run, account login and alert work, change
@@ -165,3 +186,24 @@ safety rules. You will receive this summary in the test email.
 This diagnostic does not read card details, credentials or payment forms.
 Inspect the actual Vinted listing/checkout within your own noVNC session
 before configuring the two checkout verification selectors.
+
+## Docker command is not recognized on macOS
+
+If `docker compose --env-file ...` shows `unknown flag: --env-file`
+or `docker: 'compose' is not a docker command`, Docker Compose V2 is not
+available through the Docker CLI. This is a **host installation issue**, not
+a Vinted sniper error. Check:
+
+```bash
+docker --version
+docker compose version
+docker info
+```
+
+On a Mac, install or update **Docker Desktop** (with the included Compose V2
+plugin), then start Docker Desktop and verify that `docker compose version`
+works before running the commands above. Simply reinstalling Python packages
+will not fix a missing Docker Compose command.
+
+If `git clone` says the destination directory already exists, don't clone
+again: run `cd ~/vinted-sniper-reservation && git pull --ff-only`.
