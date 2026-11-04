@@ -186,3 +186,8 @@ def test_dry_run_inspection_excludes_payment_button():
     report = browser.inspect_buy_controls(driver, driver.current_url)
     assert 'safely eligible: 0' in report
     assert payment.clicks == 0
+
+
+def test_buy_label_normalizes_irregular_whitespace():
+    button = FakeButton("   Jetzt   Kaufen   ", FakeDriver())
+    assert browser._control_label(button) == "jetzt kaufen"
