@@ -20,7 +20,10 @@ def connect(grid_url: str, home_url: str):
     options.add_argument('--no-first-run')
     driver = webdriver.Remote(command_executor=grid_url, options=options)
     driver.set_page_load_timeout(25)
-    driver.get(home_url)
+    # The user controls the first site visit and signs in themselves.
+    # Starting Selenium must not automatically hit the Vinted login page.
+    if os.getenv('SNIPER_SELENIUM_OPEN_HOME_ON_CONNECT', 'false').lower() == 'true':
+        driver.get(home_url)
     return driver
 
 
