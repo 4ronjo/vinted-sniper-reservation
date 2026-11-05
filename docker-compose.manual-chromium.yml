@@ -1,0 +1,21 @@
+# Human-operated Chromium browser, separate from Selenium and its WebDriver session.
+# This is NOT connected to the checkout worker and cannot open/reserve items automatically.
+# Run: docker compose --env-file .checkout.env -f docker-compose.manual-chromium.yml up -d
+# Open: https://localhost:7901 (local HTTPS; self-signed certificate warning is expected)
+services:
+  manual-chromium:
+    image: lscr.io/linuxserver/chromium:latest
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+      CUSTOM_USER: local
+      PASSWORD: "${SNIPER_VNC_PASSWORD:?Set SNIPER_VNC_PASSWORD in .checkout.env}"
+      CHROME_CLI: https://www.vinted.de
+    ports:
+      - "127.0.0.1:7901:3001"
+    shm_size: "1gb"
+    volumes:
+      - manual-chromium-config:/config
+
+volumes:
+  manual-chromium-config:
