@@ -147,6 +147,28 @@ until you explicitly confirm the completed login through
 `POST /control/login-confirmed/{your-webhook-token}`. This is a manual
 acknowledgment, **not an automatic verification of session validity**.
 
+**Manual Chromium desktop (without Selenium):** The fork now includes
+[`docker-compose.manual-chromium.yml`](docker-compose.manual-chromium.yml).
+It launches a regular human-operated Chromium browser at
+`https://localhost:7901` (local HTTPS, self-signed certificate).
+From the project directory run:
+
+```bash
+docker compose --env-file .checkout.env \
+  -f docker-compose.yml -f docker-compose.checkout.yml \
+  stop browser checkout-worker
+
+docker compose --env-file .checkout.env \
+  -f docker-compose.manual-chromium.yml up -d
+```
+
+Sign in manually in that Chromium desktop using your account's supported
+login method; the desktop is protected by username `local` and the
+existing `SNIPER_VNC_PASSWORD`. **This is not a fix for a platform-side
+account/network block, nor does it make the existing Selenium worker
+control that browser**. Shared-checkout automation remains unverified.
+See [manual Chromium instructions](docs/shared-checkout.md#human-operated-chromium-without-selenium-new).
+
 **Available fallback:** Set `SNIPER_CHECKOUT_ALERT_ONLY=true` in your
 private `.checkout.env`, configure sender SMTP credentials, and rebuild
 the `checkout-worker` service. Its webhook then emails direct item URLs
