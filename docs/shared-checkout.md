@@ -9,6 +9,49 @@ site: a button/link on an **item page** matching "Kaufen" / "Buy" exactly.
 After it reaches checkout, it makes no further clicks and waits for you to leave
 the checkout using the **same visible Chromium browser**.
 
+## Selenium: manual-first mode (no login automation)
+
+**The Selenium/browser checkout mode remains experimental and has not
+been accepted by Vinted in the reported session.** The changes below
+do not conceal Selenium or bypass Vinted's anti-automation controls.
+
+The Selenium worker now opens Chromium **without visiting Vinted at
+startup**. This avoids an unnecessary automated login-page navigation,
+but Chrome will still be an automated browser and Vinted may reject it.
+
+1. Keep `SNIPER_CHECKOUT_DRY_RUN=true` and
+   `SNIPER_CHECKOUT_ALERT_ONLY=false` in your private `.checkout.env`.
+   `SNIPER_SELENIUM_OPEN_HOME_ON_CONNECT=false` is the default.
+2. Start the three standard services:
+
+   ```bash
+   docker compose --env-file .checkout.env -f docker-compose.yml \
+     -f docker-compose.checkout.yml up -d --build
+   ```
+
+3. Open `http://localhost:7900/vnc.html?autoconnect=1&resize=scale`,
+   enter the VNC password, and **manually** visit `https://www.vinted.de`.
+   Sign in yourself using a method Vinted supports for your account.
+   Complete any required verification directly on the provider site.
+4. Only if login really succeeded, confirm using the existing
+   `/control/login-confirmed/{secret}` endpoint (instructions below).
+   `/health` distinguishes manual acknowledgment from verified identity.
+
+If Vinted displays **"Your session has been blocked"** or a notice
+of unusual/automated activity, the worker records
+`"platform_blocked": true` and
+`"status": {"stage": "platform-blocked", ...}`, clears login
+confirmation, and **stops all further browser navigation or clicks**.
+`/control/resume` and `/control/login-confirmed` then reject with
+HTTP 409. No repeated login attempts, random delays, or spoofing
+are performed. A restart is not an instruction to retry against an
+existing platform-side block; use Vinted support or the email-only
+notification mode instead.
+
+The existing worker does **not** control the separate human-operated
+Chromium desktop at `https://localhost:7901`. That remains a
+manual-only alternative.
+
 ## Confirmed Selenium login block and safe fallback
 
 On **5 November 2026**, Vinted displayed **"Your session has been blocked"**
@@ -147,8 +190,8 @@ Keep the shared browser open in a browser tab on your computer:
 
 **http://localhost:7900/vnc.html?autoconnect=1&resize=scale**
 
-Authenticate with your VNC password, then log into your Vinted account
-inside that Chromium browser. It is the **same browser** the sniper later
+Authenticate with your VNC password, then manually navigate to Vinted and
+log into your account inside that Chromium browser. It is the **same browser** the sniper later
 uses; it does not open a second checkout in a separate local window.
 
 **Manual SMS/email verification:** Vinted can require a one-time code when
