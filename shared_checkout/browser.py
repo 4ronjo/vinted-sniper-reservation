@@ -144,6 +144,8 @@ def open_listing_and_click_buy(driver, url: str, dry_run: bool) -> bool:  # noqa
     from selenium.webdriver.support.ui import WebDriverWait  # noqa: PLC0415
 
     driver.get(url)  # same browser window, never a new window or tab
+    if platform_blocked(driver):
+        raise RuntimeError('Vinted hat diese Selenium-Sitzung blockiert; keine weiteren Aktionen')
     if not is_vinted_item_url(driver.current_url):
         raise RuntimeError('Artikel nicht erreichbar oder Konto nicht angemeldet')
     if dry_run:
