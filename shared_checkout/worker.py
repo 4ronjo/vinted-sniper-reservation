@@ -25,6 +25,7 @@ QUEUE = Queue(maxsize=min(25, max(1, int(os.getenv('SNIPER_CHECKOUT_QUEUE_SIZE',
 LIMIT_STR = os.getenv('SNIPER_CHECKOUT_MAX_TOTAL_EUR', '').strip()
 LIMIT = Decimal(LIMIT_STR) if LIMIT_STR else None
 DRY_RUN = os.getenv('SNIPER_CHECKOUT_DRY_RUN', 'true').lower() == 'true'
+ALERT_ONLY = os.getenv('SNIPER_CHECKOUT_ALERT_ONLY', 'false').lower() == 'true'
 GRID_URL = os.getenv('SNIPER_SELENIUM_URL', 'http://browser:4444/wd/hub')
 HOME_URL = os.getenv('SNIPER_VINTED_HOME', 'https://www.vinted.de')
 seen: set[str] = set()
@@ -39,6 +40,46 @@ def change_state(stage: str, item: str | None = None, message: str = '') -> None
     with lock:
         state.update(stage=stage, item=item, message=message)
     LOG.info('State %s item=%s %s', stage, item, message)
+
+
+def do_alert_only():
+    """Send listing links without using Selenium or controlling the Vinted browser."""
+    change_state('alerts-only', message='Browser automation disabled; waiting for listings')
+    while not stop.is_set():
+        if paused.is_set():
+            change_state('paused', message='Listing email alerts paused')
+            stop.wait(0.5)
+            continue
+        try:
+            listing = QUEUE.get(timeout=1)
+        except Empty:
+            continue
+        try:
+            # A pause could have been requested while the queue was read.
+            while paused.is_set() and not stop.is_set():
+                stop.wait(0.5)
+            if stop.is_set():
+                break
+            change_state('alerting', listing.item_key)
+            sent = email_status(
+                listing,
+                'Neuer Artikel - manuell öffnen',
+                'Keine Browserautomatisierung oder Reservierung: '
+                'Öffne den Artikellink in deinem normal angemeldeten Browser.',
+                alert_only=True,
+            )
+            if sent:
+                change_state('alerts-only', message='Email sent; waiting for listings')
+            else:
+                change_state(
+                    'alert-delivery-failed', listing.item_key,
+                    'SMTP delivery failed; inspect worker logs',
+                )
+        except Exception:
+            LOG.exception('Email-only notification failed')
+            change_state('alert-delivery-failed', listing.item_key)
+        finally:
+            QUEUE.task_done()
 
 
 def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout state machine
@@ -163,7 +204,15 @@ async def lifespan(_app: FastAPI):
         raise RuntimeError('Configure SNIPER_CHECKOUT_WEBHOOK_TOKEN (at least 24 characters)')
     if not is_vinted_item_url(HOME_URL.rstrip('/') + '/items/1'):
         raise RuntimeError('SNIPER_VINTED_HOME must be a permitted Vinted domain')
-    t = Thread(target=do_work, name='checkout-browser', daemon=True)
+    if ALERT_ONLY and not all((
+        os.getenv('SNIPER_SMTP_USER', '').strip(),
+        os.getenv('SNIPER_SMTP_APP_PASSWORD', '').strip(),
+        os.getenv('SNIPER_CHECKOUT_EMAIL_TO', '').strip(),
+    )):
+        raise RuntimeError('Email-only mode requires sender, SMTP app password, and recipient')
+    target = do_alert_only if ALERT_ONLY else do_work
+    t = Thread(target=target, name='checkout-alerts' if ALERT_ONLY else 'checkout-browser',
+               daemon=True)
     t.start()
     try:
         yield
@@ -182,7 +231,8 @@ def health():
     return {
         'status': current,
         'queued': QUEUE.qsize(),
-        'dry_run': DRY_RUN,
+        'dry_run': DRY_RUN or ALERT_ONLY,
+        'mode': 'alerts-only' if ALERT_ONLY else 'shared-browser',
         'paused': paused.is_set(),
         'login_confirmed_by_user': auth_ready.is_set(),
         'login_note': 'Manual confirmation only; does not prove platform authentication',
@@ -244,6 +294,11 @@ def confirm_manual_login(secret: str):
     """User acknowledges completing all Vinted login/2FA steps in the shared browser."""
     if not SECRET or not hmac.compare_digest(secret, SECRET):
         raise HTTPException(status_code=403, detail='Invalid token')
+    if ALERT_ONLY:
+        raise HTTPException(
+            status_code=409,
+            detail='Email-only mode does not use browser login confirmation',
+        )
     auth_ready.set()
     return {
         'login_confirmed_by_user': True,
