@@ -25,6 +25,28 @@ def connect(grid_url: str, home_url: str):
 
 
 
+BLOCK_NOTICE_TEXT = (
+    'your session has been blocked',
+    'unusual or automated activity',
+    'deine sitzung wurde gesperrt',
+    'deine sitzung wurde blockiert',
+)
+
+
+def platform_blocked(driver) -> bool:
+    """Read-only check; return true for a platform block notice."""
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
+
+    try:
+        body = driver.find_elements(By.TAG_NAME, 'body')
+        if not body:
+            return False
+        text = body[0].text.casefold()
+        return any(marker in text for marker in BLOCK_NOTICE_TEXT)
+    except Exception:  # noqa: BLE001 - the worker handles browser disconnects
+        return False
+
+
 def checkout_ui_verified(driver) -> bool:
     """Require an operator-validated checkout-only DOM marker.
 
