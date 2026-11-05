@@ -9,6 +9,56 @@ site: a button/link on an **item page** matching "Kaufen" / "Buy" exactly.
 After it reaches checkout, it makes no further clicks and waits for you to leave
 the checkout using the **same visible Chromium browser**.
 
+## Confirmed Selenium login block and safe fallback
+
+On **5 November 2026**, Vinted displayed **"Your session has been blocked"**
+in the Selenium-managed Chromium browser, citing unusual or automated
+activity. An earlier **Sign in with Apple** attempt failed identity
+verification. This is a block from the platform; longer or randomized
+waits are not a verified fix. The shared-browser checkout is therefore
+**not working in that reported environment**.
+
+### Continue using the bot for item alerts
+
+You can sign in normally to Vinted in your ordinary Safari/Chrome browser
+and run the original search/notification app separately. For email
+notifications through the experimental worker, enable this **optional
+email-only fallback** in your *private* `.checkout.env`:
+
+```dotenv
+SNIPER_CHECKOUT_ALERT_ONLY=true
+SNIPER_CHECKOUT_DRY_RUN=true
+SNIPER_SMTP_USER=your-sender@example.com
+SNIPER_SMTP_APP_PASSWORD=your-private-email-app-password
+SNIPER_CHECKOUT_EMAIL_TO=your-recipient@example.com
+```
+
+Use genuine sender credentials in the local file only, never in git or
+chat. This mode requires all three SMTP values. If you already connected
+saved searches to the checkout-worker webhook, keep their routing. Then
+rebuild just the worker:
+
+```bash
+docker compose --env-file .checkout.env -f docker-compose.yml \
+  -f docker-compose.checkout.yml up -d --build checkout-worker
+curl -sS http://127.0.0.1:8765/health
+```
+
+Health should report `"mode": "alerts-only"`. In this mode, incoming
+webhook listings are emailed with a direct listing URL, and **no Selenium
+session is created by the worker**. It neither opens checkout, reserves
+an item, nor confirms a purchase. You must follow the link manually in
+the normal signed-in browser. The original dashboard's Discord,
+Telegram, ntfy and webhook notification options also remain available
+without using the checkout worker.
+
+To return to the experimental shared-browser mode, set
+`SNIPER_CHECKOUT_ALERT_ONLY=false`, keep dry-run enabled, and restart
+the worker. This does **not** resolve Vinted's existing block: do not
+manually confirm login unless it actually succeeds.
+
+---
+
 ## 1. Configure
 
 Use the `feature/checkout-snipe-email` branch. The same live browser can be viewed through noVNC; it is NOT the Vinted tab in another browser or app.
