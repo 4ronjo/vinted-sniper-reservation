@@ -12,7 +12,8 @@ from decimal import Decimal
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 
-from browser import checkout_ui_verified, connect, inspect_buy_controls, open_listing_and_click_buy
+from browser import (checkout_ui_verified, connect, inspect_buy_controls, open_listing_and_click_buy,
+                     platform_blocked)
 from fastapi import FastAPI, HTTPException, Request
 from notify import email_status
 from validation import is_checkout_url, is_vinted_item_url, parse_listing
@@ -31,6 +32,7 @@ HOME_URL = os.getenv('SNIPER_VINTED_HOME', 'https://www.vinted.de')
 seen: set[str] = set()
 paused = Event()
 auth_ready = Event()  # Never navigate until the user finishes login + any 2FA
+platform_block = Event()  # Platform block is sticky until the worker is restarted
 lock = Lock()
 stop = Event()
 state = {'stage': 'starting', 'item': None, 'message': ''}
@@ -99,6 +101,18 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
                 change_state('browser-not-ready')
                 stop.wait(5)
                 continue
+        if platform_block.is_set():
+            stop.wait(1)
+            continue
+        if platform_blocked(driver):
+            platform_block.set()
+            auth_ready.clear()
+            paused.set()
+            change_state(
+                'platform-blocked',
+                message='Vinted blocked this automated session; no further browser actions',
+            )
+            continue
         if not auth_ready.is_set():
             change_state(
                 'awaiting-manual-login',
@@ -139,6 +153,15 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
                 break
             change_state('opening', listing.item_key)
             opened = open_listing_and_click_buy(driver, listing.url, DRY_RUN)
+            if platform_blocked(driver):
+                platform_block.set()
+                auth_ready.clear()
+                paused.set()
+                change_state(
+                    'platform-blocked', listing.item_key,
+                    'Vinted blocked this automated session; no retries',
+                )
+                continue
             if not opened:
                 change_state('dry-run', listing.item_key)
                 inspection = inspect_buy_controls(driver, listing.url)
@@ -183,13 +206,20 @@ def do_work():  # noqa: C901, PLR0912, PLR0915 - explicit fail-closed checkout s
             # display login/2FA or a changed site. Require explicit manual review.
             # Never capture a password, email challenge or one-time code.
             auth_ready.clear()
+            if driver is not None and platform_blocked(driver):
+                platform_block.set()
+                paused.set()
+                change_state(
+                    'platform-blocked', listing.item_key,
+                    'Vinted blocked this automated session; no retries',
+                )
             try:
                 _ = driver.current_url
             except Exception:  # noqa: BLE001 - Selenium may disconnect for many reasons
                 driver = None
         finally:
             QUEUE.task_done()
-            if driver is not None and not stop.is_set():
+            if driver is not None and not stop.is_set() and not platform_block.is_set():
                 change_state('ready', message='Waiting for new item')
     if driver is not None:
         try:
@@ -234,6 +264,7 @@ def health():
         'dry_run': DRY_RUN or ALERT_ONLY,
         'mode': 'alerts-only' if ALERT_ONLY else 'shared-browser',
         'paused': paused.is_set(),
+        'platform_blocked': platform_block.is_set(),
         'login_confirmed_by_user': auth_ready.is_set(),
         'login_note': 'Manual confirmation only; does not prove platform authentication',
     }
@@ -285,6 +316,8 @@ def pause_browser(secret: str):
 def resume_browser(secret: str):
     if not SECRET or not hmac.compare_digest(secret, SECRET):
         raise HTTPException(status_code=403, detail='Invalid token')
+    if platform_block.is_set():
+        raise HTTPException(status_code=409, detail='Platform has blocked the browser session')
     paused.clear()
     return {'paused': False}
 
@@ -299,6 +332,8 @@ def confirm_manual_login(secret: str):
             status_code=409,
             detail='Email-only mode does not use browser login confirmation',
         )
+    if platform_block.is_set():
+        raise HTTPException(status_code=409, detail='Platform has blocked the browser session')
     auth_ready.set()
     return {
         'login_confirmed_by_user': True,
