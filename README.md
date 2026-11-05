@@ -147,6 +147,14 @@ until you explicitly confirm the completed login through
 `POST /control/login-confirmed/{your-webhook-token}`. This is a manual
 acknowledgment, **not an automatic verification of session validity**.
 
+**Available fallback:** Set `SNIPER_CHECKOUT_ALERT_ONLY=true` in your
+private `.checkout.env`, configure sender SMTP credentials, and rebuild
+the `checkout-worker` service. Its webhook then emails direct item URLs
+without connecting to Selenium. You can sign in with Apple normally
+in your regular browser and open links there yourself. No shared
+checkout, reservation, or automatic purchase is performed in this mode.
+See [detailed setup](docs/shared-checkout.md#continue-using-the-bot-for-item-alerts).
+
 **Known blocker:** A reported attempt to sign in to Vinted using
 **Sign in with Apple** inside the Selenium-managed Chromium browser
 failed with an identity-verification error. No code change has resolved
