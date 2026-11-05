@@ -191,3 +191,41 @@ def test_dry_run_inspection_excludes_payment_button():
 def test_buy_label_normalizes_irregular_whitespace():
     button = FakeButton("   Jetzt   Kaufen   ", FakeDriver())
     assert browser._control_label(button) == "jetzt kaufen"
+
+
+def test_visible_platform_block_stops_selenium_click(monkeypatch):
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
+
+    monkeypatch.setattr(By, 'TAG_NAME', 'tag', raising=False)
+
+    class BlockedDriver(FakeDriver):
+        def find_elements(self, _by, selector):
+            if selector == 'body':
+                return [SimpleNamespace(
+                    text='Your session has been blocked due to unusual or automated activity',
+                )]
+            return self.controls
+
+    driver = BlockedDriver()
+    button = FakeButton('Kaufen', driver)
+    driver.controls = [button]
+    assert browser.platform_blocked(driver)
+    with pytest.raises(RuntimeError, match='blockiert'):
+        browser.open_listing_and_click_buy(
+            driver, 'https://www.vinted.de/items/123-example', False,
+        )
+    assert button.clicks == 0
+
+
+def test_nonblocked_page_does_not_match_platform_notice(monkeypatch):
+    from selenium.webdriver.common.by import By  # noqa: PLC0415
+
+    monkeypatch.setattr(By, 'TAG_NAME', 'tag', raising=False)
+
+    class RegularDriver(FakeDriver):
+        def find_elements(self, _by, selector):
+            if selector == 'body':
+                return [SimpleNamespace(text='Welcome to your listings')]
+            return self.controls
+
+    assert not browser.platform_blocked(RegularDriver())
