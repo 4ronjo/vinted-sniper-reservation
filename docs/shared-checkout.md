@@ -18,6 +18,66 @@ verification. This is a block from the platform; longer or randomized
 waits are not a verified fix. The shared-browser checkout is therefore
 **not working in that reported environment**.
 
+### Human-operated Chromium without Selenium (new)
+
+The experimental shared-browser session was blocked by Vinted, so there is
+now a **separate, ordinary Chromium desktop** in
+[`docker-compose.manual-chromium.yml`](../docker-compose.manual-chromium.yml).
+It is a Chromium browser you control manually through a local web desktop;
+it does **not** launch through Selenium or expose a WebDriver session.
+
+On the Mac, from the repository root:
+
+```bash
+# Stop Selenium's blocked browser and its checkout worker; leave the
+# original search dashboard running.
+docker compose --env-file .checkout.env \
+  -f docker-compose.yml -f docker-compose.checkout.yml \
+  stop browser checkout-worker
+
+# Start ordinary, manual Chromium only.
+docker compose --env-file .checkout.env \
+  -f docker-compose.manual-chromium.yml up -d
+
+docker compose --env-file .checkout.env \
+  -f docker-compose.manual-chromium.yml ps
+```
+
+Then open **https://localhost:7901** in your Mac's browser. The
+LinuxServer Chromium desktop uses **HTTPS with a self-signed
+certificate**; a local certificate warning is expected. It prompts
+for username **`local`** and the existing
+`SNIPER_VNC_PASSWORD` from your private `.checkout.env` file.
+Only the local machine can connect to this port.
+
+Manually sign in to Vinted inside this separate Chromium desktop via
+**Sign in with Apple** or any other login method supported by your
+account. Enter Apple/Vinted passwords and any 2FA code **only in the
+official login pages**, never in a bot configuration file or chat.
+This browser has its **own persistent `manual-chromium-config`
+volume**, separate from Selenium's existing blocked session.
+
+**Scope and limits:**
+- This gives you a real, human-operated Chromium desktop without
+  Selenium. We have **not verified** that Vinted will accept sign-in
+  in this Docker environment. A platform-side/IP/account restriction
+  may remain even without Selenium.
+- The manual Chromium desktop is **NOT** controllable by the existing
+  Selenium checkout worker; it does not implement the same-checkout
+  automation, buy clicks, or reservations. Those remain unavailable.
+- Keep using the original dashboard for search alerts, or use the
+  email-only worker fallback below. Open listing links manually in
+  this Chromium desktop or in regular Mac Chrome.
+- If Vinted still reports your session blocked, stop retrying and
+  use its official support or an ordinary local browser. There is
+  no bypass or randomized-request workaround here.
+
+Docker image documentation:
+[LinuxServer Chromium](https://docs.linuxserver.io/images/docker-chromium/).
+Its remote desktop can expose a terminal with elevated container privileges,
+so **never expose port 7901 to your LAN or the internet**. The supplied
+compose file binds it to `127.0.0.1` only.
+
 ### Continue using the bot for item alerts
 
 You can sign in normally to Vinted in your ordinary Safari/Chrome browser
