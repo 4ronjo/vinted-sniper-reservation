@@ -229,3 +229,73 @@ def test_nonblocked_page_does_not_match_platform_notice(monkeypatch):
             return self.controls
 
     assert not browser.platform_blocked(RegularDriver())
+
+
+def test_selenium_connect_does_not_visit_vinted_before_manual_login(monkeypatch):
+    # Minimal fake Selenium remote browser: no network or actual Chrome required.
+    fake_options_module = ModuleType('selenium.webdriver.chrome.options')
+    fake_chrome_module = ModuleType('selenium.webdriver.chrome')
+
+    class FakeOptions:
+        def add_argument(self, _value):
+            pass
+
+    class RecordingDriver:
+        def __init__(self):
+            self.visited = []
+
+        def set_page_load_timeout(self, _timeout):
+            pass
+
+        def get(self, url):
+            self.visited.append(url)
+
+    driver = RecordingDriver()
+    fake_options_module.Options = FakeOptions
+    webdriver = sys.modules['selenium.webdriver']
+    monkeypatch.setattr(
+        webdriver, 'Remote', lambda **_kwargs: driver, raising=False,
+    )
+    monkeypatch.setitem(sys.modules, 'selenium.webdriver.chrome', fake_chrome_module)
+    monkeypatch.setitem(
+        sys.modules, 'selenium.webdriver.chrome.options', fake_options_module,
+    )
+    monkeypatch.delenv('SNIPER_SELENIUM_OPEN_HOME_ON_CONNECT', raising=False)
+
+    result = browser.connect('http://browser:4444/wd/hub', 'https://www.vinted.de')
+    assert result is driver
+    assert driver.visited == []
+
+
+def test_selenium_initial_navigation_is_opt_in(monkeypatch):
+    fake_options_module = ModuleType('selenium.webdriver.chrome.options')
+    fake_chrome_module = ModuleType('selenium.webdriver.chrome')
+
+    class FakeOptions:
+        def add_argument(self, _value):
+            pass
+
+    class RecordingDriver:
+        def __init__(self):
+            self.visited = []
+
+        def set_page_load_timeout(self, _timeout):
+            pass
+
+        def get(self, url):
+            self.visited.append(url)
+
+    driver = RecordingDriver()
+    fake_options_module.Options = FakeOptions
+    webdriver = sys.modules['selenium.webdriver']
+    monkeypatch.setattr(
+        webdriver, 'Remote', lambda **_kwargs: driver, raising=False,
+    )
+    monkeypatch.setitem(sys.modules, 'selenium.webdriver.chrome', fake_chrome_module)
+    monkeypatch.setitem(
+        sys.modules, 'selenium.webdriver.chrome.options', fake_options_module,
+    )
+    monkeypatch.setenv('SNIPER_SELENIUM_OPEN_HOME_ON_CONNECT', 'true')
+
+    browser.connect('http://browser:4444/wd/hub', 'https://www.vinted.de')
+    assert driver.visited == ['https://www.vinted.de']
