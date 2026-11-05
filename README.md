@@ -147,6 +147,15 @@ until you explicitly confirm the completed login through
 `POST /control/login-confirmed/{your-webhook-token}`. This is a manual
 acknowledgment, **not an automatic verification of session validity**.
 
+**Selenium manual-first startup (new):** The existing noVNC/Selenium
+browser now starts with a blank tab and waits for you to visit Vinted
+and sign in manually. It does not auto-type passwords, complete
+identity challenges, or navigate the login page. When Vinted explicitly
+blocks the session, the worker stops and reports `platform-blocked`;
+it will not keep retrying or click buy. This **does not** guarantee
+Vinted will accept a WebDriver session.
+See [Selenium manual-first guide](docs/shared-checkout.md#selenium-manual-first-mode-no-login-automation).
+
 **Manual Chromium desktop (without Selenium):** The fork now includes
 [`docker-compose.manual-chromium.yml`](docker-compose.manual-chromium.yml).
 It launches a regular human-operated Chromium browser at
